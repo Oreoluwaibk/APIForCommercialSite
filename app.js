@@ -37,6 +37,7 @@ conectToDB();
 //MODEL FOR THE GOODS TO BE PURCHASE
 const itemSchema = new mongoose.Schema({
     ID: Number,
+    productID: Number,
     product: String,
     amount: Number,
     amountOrder: Number
@@ -50,7 +51,6 @@ const Order = new mongoose.model("Order", itemSchema);
 const personSchema = new mongoose.Schema({
     username: String,
     password: String,
-    productID: itemSchema,
     validated: Boolean,
 });
 
@@ -79,7 +79,6 @@ const schema = Joi.object({
 
     repeat_password: Joi.ref('password'),
 
-    order: Joi.number,
 })
 
 
@@ -145,7 +144,6 @@ app.post("/signup", (req, res) => {
         const person = new Person ({
             name: value.name,
             password: hashedPassword,
-            productID: value.ID,
             validated: false 
         })
         try {
@@ -236,7 +234,8 @@ app.post("/verifyOTP", async (req, res)=>{
 
 //THIS BLOCK IS TO DIRECT TO THE PAY POINT
 app.get("/pay", (req, res) => {
-    Order.find({order_id: 1}, (err, foundItem)=>{
+    const productNUm = req.body.productID
+    Order.find({productID: productNUm}, (err, foundItem)=>{
         res.send(foundItem);
     })
 });
