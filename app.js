@@ -14,10 +14,24 @@ app.use(bodyParser.urlencoded({extended: true}));
 //CODE TO CONNECT TO LOCAL MONGODB
 const MONGO_URL = "mongodb://127.0.0.1:27017/salesDB";
 
-mongoose.connect(MONGO_URL, () => {
-    console.log("success connection to database");
-});
 
+const conectToDB = async () =>{
+    try {
+        await mongoose.connect(MONGO_URL, () => {
+            console.log("success connection to database");
+            //THIS BLOCK IS TO LISTEN TO THE SERVER
+
+            const PORT = process.env.PORT || 3000
+
+            app.listen(PORT, ()=> {
+                console.log(`listening on ${PORT}`);
+            })
+        }); 
+    } catch (error) {
+        console.log(error);
+    }
+}
+conectToDB();
 
 //THIS BLOCK OF CODE WILL CREATE THE DIFFRENT MODEL AND SCHEMA'S FOR THE DATABASE
 //MODEL FOR THE GOODS TO BE PURCHASE
@@ -27,6 +41,7 @@ const itemSchema = new mongoose.Schema({
     amount: Number,
     amountOrder: Number
 });
+
 
 const Order = new mongoose.model("Order", itemSchema);
 
@@ -94,14 +109,26 @@ app.post("/login", (req, res) => {
     if(err){
         res.send(res.json({err}))
     }else{
-        Person.findOne({name: value.name}, (err, result) => {
-            console.log(result);
-            const hash = result.password
-            bcrypt.compare(value.password, hash, function(err, result) {
-                res.redirect("/")
+        try {
+            Person.findOne({name: value.name}, (err, result) => {
+                console.log(result);
+                const hash = result.password;
+                const hashedPassword = bcrypt.compare(value.password, hash);
+                if (!hashedPassword){
+                    res.json({
+                        status: "USER NOT REGISTERED",
+                        message: "kindly register to access"
+                    });
+                    res.redirect("/signup")
+                }else{
+                    res.redirect("/")
+                }
+            })
+        } catch (error) {
+            res.json({
+                message: error
             });
-        })
-       
+        }
     }
 })
 
@@ -111,7 +138,7 @@ app.post("/signup", (req, res) => {
     let { err, value } = schema.validate(req.body);
     const saltRounds = 10;
     if(err){
-        res.send(res.json({err}));
+        res.send(err);
     }
     if (value){
         const hashedPassword = bcrypt.hash(value.password, saltRounds);
@@ -121,11 +148,18 @@ app.post("/signup", (req, res) => {
             productID: value.ID,
             validated: false 
         })
-        person.save(()=>{
-            console.log("saved");
-        })
-        sendOTPVerificationEmail( value , res);    
-
+        try {
+            person.save(()=>{
+                console.log("saved");
+            })
+            sendOTPVerificationEmail( value , res);  
+        } catch (error) {
+            res.json({
+                status: "NOT RESGITERED",
+                message: error
+            });
+            res.redirect("/signup")
+        }
     }
 });
 
@@ -145,9 +179,14 @@ app.post("/resetpassword", (req, res) => {
             res.redirect("/signup")
         }else{
             const saltRounds = 10;
-            const hashedPassword = bcrypt.hash(value.password, saltRounds);
-            Person.updateOne({name: validUser}, {password: hashedPassword});
-            sendOTPVerificationEmail(value, res);
+            try {
+                const hashedPassword = bcrypt.hash(value.password, saltRounds);
+                Person.updateOne({name: validUser}, {password: hashedPassword});
+                sendOTPVerificationEmail(value, res);
+            } catch (error) {
+                res.send(error);  
+            }
+            
         }
     }
     
@@ -260,10 +299,3 @@ const sendOTPVerificationEmail = async ({ ID, name }, res) => {
 }
 
 
-//THIS BLOCK IS TO LISTEN TO THE SERVER
-
-const PORT = process.env.PORT || 3000
-
-app.listen(PORT, ()=> {
-    console.log(`listening on ${PORT}`);
-})
